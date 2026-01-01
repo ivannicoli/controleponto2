@@ -99,6 +99,7 @@
                                         <template x-for="key in ['m1', 'm2', 'm3', 'm4']">
                                             <td class="p-2">
                                                 <input type="text" x-model="row[key]"
+                                                    @input="handleTimeInput($event, row, key)"
                                                     class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-center font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow placeholder-slate-300"
                                                     placeholder="--:--" @focus="$el.select()">
                                             </td>
@@ -330,6 +331,14 @@
                     }
 
                     return notes.join('\n');
+                },
+                // Input Mask: Auto-format to HH:MM
+                handleTimeInput(e, row, key) {
+                    let v = e.target.value.replace(/\D/g, ''); // Digits only
+                    if (v.length > 4) v = v.slice(0, 4);
+                    if (v.length > 2) v = v.slice(0, 2) + ':' + v.slice(2);
+                    e.target.value = v;
+                    row[key] = v; // Update model manually
                 },
 
                 async uploadFile(file) {
