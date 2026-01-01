@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extrator de Ponto Inteligente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        [x-cloak] {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen relative overflow-x-hidden">
+
+    <!-- Decorative background elements -->
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div
+            class="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-violet-200/50 rounded-full blur-3xl opacity-60 mix-blend-multiply animate-blob">
+        </div>
+        <div
+            class="absolute top-[20%] -right-[10%] w-[35%] h-[35%] bg-indigo-200/50 rounded-full blur-3xl opacity-60 mix-blend-multiply animate-blob animation-delay-2000">
+        </div>
+        <div
+            class="absolute -bottom-[10%] left-[20%] w-[45%] h-[45%] bg-blue-200/50 rounded-full blur-3xl opacity-60 mix-blend-multiply animate-blob animation-delay-4000">
+        </div>
+    </div>
+
+    <div class="w-full max-w-[95%] mx-auto px-6 py-12" x-data="appData()">
+
+        <!-- Header -->
+        <header class="mb-12 text-center">
+            <h1
+                class="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-violet-600 to-indigo-600 mb-4">
+                Smart Timecard OCR
+            </h1>
+            <p class="text-lg text-slate-500 max-w-2xl mx-auto">
+                Carregue a imagem do seu espelho de ponto para extrair e editar os registros automaticamente.
+            </p>
+        </header>
+
+        <!-- Main Content Grid -->
+        <div class="grid gap-12 items-start duration-500 ease-in-out"
+            :class="parsedData.length > 0 ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'">
+
+            <!-- Results Table (Swapped to Top) -->
+            <div x-show="parsedData.length > 0" x-transition.opacity.duration.500ms x-cloak>
+                <div class="glass rounded-3xl p-1 shadow-xl shadow-indigo-100/50 overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h2 class="text-xl font-bold text-slate-800">Registros Identificados</h2>
+                        <div class="flex space-x-2">
+                            <button @click="parsedData = []"
+                                class="px-4 py-2 text-sm text-slate-500 hover:text-slate-700 font-medium transition-colors">
+                                Cancelar
+                            </button>
+                            <button
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-xl text-sm font-semibold shadow-lg shadow-indigo-600/30 transition-all hover:shadow-indigo-600/40 active:scale-95">
+                                Salvar Alterações
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr
+                                    class="bg-slate-50/50 text-xs uppercase tracking-wider text-slate-500 font-bold border-b border-slate-100">
+                                    <th class="p-4 w-16 text-center">Dia</th>
+                                    <th class="p-4 w-24">Semana</th>
+                                    <th class="p-4">Entrada 1</th>
+                                    <th class="p-4">Saída 1</th>
+                                    <th class="p-4 w-28 text-center">Entrada 2</th>
+                                    <th class="p-4 w-28 text-center">Saída 2</th>
+                                    <th class="p-4 text-left">Observações / Sugestões</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <template x-for="(row, index) in parsedData" :key="index">
+                                    <tr class="hover:bg-slate-50/50 transition-colors group">
+                                        <td class="p-4 text-center font-bold text-slate-700" x-text="row.day"></td>
+                                        <td class="p-4 text-sm text-slate-500" x-text="row.weekday"></td>
+
+                                        <!-- Editable Cells -->
+                                        <template x-for="key in ['m1', 'm2', 'm3', 'm4']">
+                                            <td class="p-2">
+                                                <input type="text" x-model="row[key]"
+                                                    class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-center font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow placeholder-slate-300"
+                                                    placeholder="--:--" @focus="$el.select()">
+                                            </td>
+                                        </template>
+
+                                        <!-- Suggestions Column -->
+                                        <td class="p-3">
+                                            <div class="text-xs text-indigo-600 font-medium whitespace-pre-line leading-relaxed"
+                                                x-text="getSuggestions(row)"></div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Zone (Swapped to Bottom) -->
+            <div class="glass rounded-3xl p-8 shadow-xl shadow-indigo-100/50 text-center transition-all duration-300 hover:shadow-2xl hover:scale-[1.005]"
+                @dragover.prevent="dragOver = true" @dragleave.prevent="dragOver = false"
+                @drop.prevent="handleDrop($event)" :class="{ 'border-2 border-indigo-500 bg-indigo-50/50': dragOver }">
+
+                <input type="file" id="fileInput" class="hidden" accept="image/*" @change="handleFileSelect">
+
+                <div class="space-y-6" x-show="!previewUrl">
+                    <div
+                        class="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-2xl mx-auto flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" class="w-10 h-10">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="text-xl font-medium text-slate-700">Arraste e solte sua imagem aqui</p>
+                        <p class="text-slate-400 mt-2">ou <button @click="$document.getElementById('fileInput').click()"
+                                class="text-indigo-600 hover:text-indigo-700 font-semibold underline decoration-2 underline-offset-2 transition-colors">clique
+                                para buscar</button></p>
+                    </div>
+                    <p class="text-xs text-slate-400 uppercase tracking-wide font-semibold">Suporta PNG, JPG, JPEG</p>
+                </div>
+
+                <!-- Preview + Loading State -->
+                <div x-show="previewUrl" class="relative w-full" x-cloak>
+                    <div
+                        class="relative w-full overflow-hidden shadow-lg mx-auto inline-block group rounded-xl bg-slate-900/5">
+                        <img :src="previewUrl" class="w-full h-auto object-contain">
+                        <div class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button @click="reset()"
+                                class="bg-red-500/80 hover:bg-red-600 text-white rounded-full p-2 backdrop-blur-sm transition-colors shadow-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div x-show="isLoading" class="mt-8 flex flex-col items-center">
+                        <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600">
+                        </div>
+                        <p class="text-indigo-600 font-bold text-lg mt-4 animate-pulse">Processando imagem com IA...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State / Placeholder for Data -->
+            <div x-show="parsedData.length === 0 && !isLoading && previewUrl" class="text-center py-12" x-cloak>
+                <p class="text-slate-400">Nenhum dado encontrado ou falha na leitura. Tente outra imagem.</p>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Frontend Logic -->
+    <script>
+        function appData() {
+            return {
+                dragOver: false,
+                previewUrl: null,
+                isLoading: false,
+                parsedData: [],
+
+                init() {
+                    // Adiciona suporte a Ctrl+V (paste)
+                    window.addEventListener('paste', (e) => {
+                        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                        for (const item of items) {
+                            if (item.type.indexOf('image') !== -1) {
+                                const file = item.getAsFile();
+                                this.uploadFile(file);
+                            }
+                        }
+                    });
+                },
+
+                handleDrop(e) {
+                    this.dragOver = false;
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                        this.uploadFile(file);
+                    }
+                },
+
+                handleFileSelect(e) {
+                    const file = e.target.files[0];
+                    if (file) {
+                        this.uploadFile(file);
+                    }
+                },
+
+                reset() {
+                    this.previewUrl = null;
+                    this.parsedData = [];
+                    document.getElementById('fileInput').value = '';
+                },
+
+                // Helper: Convert "HH:MM" to minutes
+                toMin(timeStr) {
+                    if (!timeStr || !timeStr.includes(':')) return null;
+                    const parts = timeStr.split(':');
+                    if (parts.length < 2) return null;
+                    const h = parseInt(parts[0]);
+                    const m = parseInt(parts[1]);
+                    if (isNaN(h) || isNaN(m)) return null;
+                    return h * 60 + m;
+                },
+
+                // Helper: Convert minutes to "HH:MM"
+                toTime(mins) {
+                    if (mins === null) return "--:--";
+                    let h = Math.floor(mins / 60);
+                    let m = Math.round(mins % 60); // Round to handle floats
+                    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+                },
+
+                // Logic: Generate suggestions
+                getSuggestions(row) {
+                    let notes = [];
+                    const m1 = this.toMin(row.m1);
+                    const m2 = this.toMin(row.m2);
+                    const m3 = this.toMin(row.m3);
+                    const m4 = this.toMin(row.m4);
+
+                    const TARGET_WORK = 480; // 8h
+                    const MIN_EXIT = 17 * 60; // 17:00
+
+                    // -----------------------------------------
+                    // SCENARIO: 3 Values (Missing Exit 1 Detection)
+                    // -----------------------------------------
+                    if (m1 !== null && m2 !== null && m3 !== null && m4 === null) {
+                        // Check if m3 looks like an Exit 2 (> 16:30) and m2 looks like Entry 2 (< 15:00)
+                        if (m3 > 16 * 60 + 30 && m2 < 15 * 60) {
+                            // Calculate implied logic
+                            const afternoon = m3 - m2;
+                            const neededMorning = TARGET_WORK - afternoon;
+                            const suggOut1 = m1 + neededMorning;
+                            const impliedLunch = m2 - suggOut1;
+
+                            // If this creates a valid lunch (45m - 2.5h), it's likely the case
+                            if (impliedLunch > 45 && impliedLunch < 150) {
+                                return `⚠️ Falta Saída 1?
+💡 Sugestão: ${this.toTime(suggOut1)}
+(Gera almoço de ${this.toTime(impliedLunch)} e fecha 8h)`;
+                            }
+                        }
+                    }
+
+                    // -----------------------------------------
+                    // STANDARD LOGIC
+                    // -----------------------------------------
+
+                    // 1. Missing Entry 1
+                    if (m1 === null) {
+                        if (m4 !== null && m3 !== null && m2 !== null) {
+                            const afternoon = m4 - m3;
+                            const neededMorning = TARGET_WORK - afternoon;
+                            const suggM1 = m2 - neededMorning;
+                            notes.push(`Entrada sugerida: ${this.toTime(suggM1)} (p/ 8h)`);
+                        } else {
+                            notes.push("Falta Entrada (Padrão: 08:00)");
+                        }
+                    }
+
+                    // 2. Lunch Rules
+                    if (m2 !== null && m3 !== null) {
+                        const lunchDuration = m3 - m2;
+                        if (lunchDuration < 60) notes.push(`⚠️ Almoço curto: ${lunchDuration}m (Mín 60m)`);
+                        if (lunchDuration > 120) notes.push(`⚠️ Almoço longo: ${this.toTime(lunchDuration, true)}`);
+                    } else if (m2 !== null && m3 === null) {
+                        notes.push(`Volta sugerida: ${this.toTime(m2 + 60)} (Mín 1h)`);
+                    }
+
+                    // 3. Exit Calculation
+                    if (m4 === null) {
+                        if (m1 !== null && m2 !== null && m3 !== null) {
+                            const morning = m2 - m1;
+                            const remaining = TARGET_WORK - morning;
+                            const target = m3 + remaining;
+
+                            let star = "";
+                            if (target < MIN_EXIT) star = "*";
+
+                            notes.push(`Saída para 8h (+${this.toTime(remaining)}):`);
+                            notes.push(`👉 ${this.toTime(target)} ${star}`);
+
+                            if (target < MIN_EXIT) {
+                                notes.push(`(Regra Mínimo: 17:00)`);
+                            }
+                        } else if (m1 !== null && m2 === null && m3 === null) {
+                            const targetSimple = m1 + TARGET_WORK + 60; // assume 1h lunch
+                            notes.push(`Prev. Saída: ~${this.toTime(targetSimple)}`);
+                        }
+                    } else {
+                        // Total Calculation
+                        if (m1 !== null && m2 !== null && m3 !== null) {
+                            const total = (m2 - m1) + (m4 - m3);
+                            if (Math.abs(total - TARGET_WORK) > 5) { // 5 min tolerance
+                                let diff = total - TARGET_WORK;
+                                let sign = diff > 0 ? "+" : "";
+                                notes.push(diff > 0 ? `✅ Total: ${this.toTime(total)} (${sign}${diff}m)`
+                                    : `⚠️ Total: ${this.toTime(total)} (Faltam ${Math.abs(diff)}m)`);
+                            } else {
+                                notes.push(`✅ Total: 8h Perfeito`);
+                            }
+                        }
+                        if (m4 < MIN_EXIT) notes.push(`⚠️ Saída antes das 17h`);
+                    }
+
+                    return notes.join('\n');
+                },
+
+                async uploadFile(file) {
+                    // Preview
+                    const reader = new FileReader();
+                    reader.onload = e => this.previewUrl = e.target.result;
+                    reader.readAsDataURL(file);
+
+                    this.isLoading = true;
+                    this.parsedData = [];
+
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    try {
+                        const response = await fetch('/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.json();
+
+                        if (result.success) {
+                            this.parsedData = result.data;
+                            if (this.parsedData.length === 0) {
+                                alert('A IA leu a imagem mas não encontrou linhas de tabela válidas. Verifique a qualidade.');
+                            }
+                        } else {
+                            alert('Erro: ' + (result.error || 'Desconhecido'));
+                        }
+                    } catch (error) {
+                        console.error(error);
+                        alert('Erro ao conectar com o servidor.');
+                    } finally {
+                        this.isLoading = false;
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Animation utility for blobs */
+        @keyframes blob {
+            0% {
+                transform: translate(0px, 0px) scale(1);
+            }
+
+            33% {
+                transform: translate(30px, -50px) scale(1.1);
+            }
+
+            66% {
+                transform: translate(-20px, 20px) scale(0.9);
+            }
+
+            100% {
+                transform: translate(0px, 0px) scale(1);
+            }
+        }
+
+        .animate-blob {
+            animation: blob 7s infinite;
+        }
+
+        .animation-delay-2000 {
+            animation-delay: 2s;
+        }
+
+        .animation-delay-4000 {
+            animation-delay: 4s;
+        }
+    </style>
+</body>
+
+</html>
